@@ -59,10 +59,16 @@ const GlobalHeader: React.FC<GlobalHeaderProps> = ({ currentPage, onNavigate }) 
   // Master loading state - wait for all critical data
   const isLoading = userLoading || requestsLoading || notificationsLoading || messagesLoading;
 
-  // Safe user data extraction with fallbacks
-  const firstName = user?.user_metadata?.first_name || user?.email?.split('@')[0] || 'User';
-  const lastName = user?.user_metadata?.last_name || '';
-  const userEmail = user?.email || '';
+  // Safe user data extraction with explicit null checks and fallbacks
+  let firstName = '';
+  let lastName = '';
+  let userEmail = '';
+
+  if (user) {
+    firstName = user.user_metadata?.first_name || user.email?.split('@')[0] || 'User';
+    lastName = user.user_metadata?.last_name || '';
+    userEmail = user.email || '';
+  }
 
   // Close dropdown when clicking outside
   useEffect(() => {
