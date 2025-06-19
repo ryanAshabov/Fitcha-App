@@ -164,7 +164,7 @@ const GlobalHeader: React.FC<GlobalHeaderProps> = ({ currentPage, onNavigate }) 
                 <div className="absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-lg border border-gray-200">
                   <div className="p-4 border-b border-gray-200">
                     <p className="font-medium text-gray-900">{firstName} {lastName}</p>
-                    <p className="text-sm text-gray-600">{user?.email}</p>
+                    <p className="text-sm text-gray-600">{user?.email || ''}</p>
                   </div>
                   <div className="py-2">
                     <button
