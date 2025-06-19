@@ -9,6 +9,10 @@ const MessagesPage: React.FC = () => {
   const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null);
   const [newMessage, setNewMessage] = useState('');
   const [sendingMessage, setSendingMessage] = useState(false);
+  
+  // Main loading state for the entire component
+  const [loading, setLoading] = useState(true);
+  
   const { conversations, loading: conversationsLoading, error: conversationsError } = useMessaging();
   
   // Conditionally call useConversation hook only when a conversation is selected
@@ -22,6 +26,11 @@ const MessagesPage: React.FC = () => {
   const sendMessage = selectedConversation ? conversationHookResult.sendMessage : async () => ({ success: false, error: 'No conversation selected' });
   
   const { user } = useAuth();
+
+  // Update loading state based on conversations loading
+  React.useEffect(() => {
+    setLoading(conversationsLoading);
+  }, [conversationsLoading]);
 
   const handleSendMessage = async () => {
     if (!newMessage.trim() || sendingMessage || !selectedConversation) return;
@@ -84,33 +93,36 @@ const MessagesPage: React.FC = () => {
     }
   };
 
+  // Implement loading state as specified in the technical brief
+  if (loading) {
+    return (
+      <div className="h-screen bg-white flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading messages...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Handle error state
+  if (conversationsError) {
+    return (
+      <div className="h-screen bg-white flex items-center justify-center">
+        <div className="text-center">
+          <MessageCircle className="w-16 h-16 text-red-400 mx-auto mb-4" />
+          <h3 className="text-lg font-medium text-gray-900 mb-2">Error Loading Messages</h3>
+          <p className="text-gray-600 mb-4">Unable to load your conversations</p>
+          <Button variant="primary" onClick={() => window.location.reload()}>
+            Try Again
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
   const renderConversationsList = () => {
-    if (conversationsLoading) {
-      return (
-        <div className="p-4">
-          <div className="space-y-3">
-            {[...Array(5)].map((_, index) => (
-              <div key={index} className="flex items-center space-x-3 p-3">
-                <div className="w-12 h-12 bg-gray-200 rounded-full animate-pulse"></div>
-                <div className="flex-grow space-y-2">
-                  <div className="h-4 bg-gray-200 rounded animate-pulse w-3/4"></div>
-                  <div className="h-3 bg-gray-200 rounded animate-pulse w-1/2"></div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      );
-    }
-
-    if (conversationsError) {
-      return (
-        <div className="p-4 text-center">
-          <p className="text-red-600 text-sm">Error loading conversations</p>
-        </div>
-      );
-    }
-
+    // Handle empty state as specified in the technical brief
     if (conversations.length === 0) {
       return (
         <div className="p-8 text-center">
