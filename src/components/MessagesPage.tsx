@@ -129,13 +129,13 @@ const MessagesPage: React.FC = () => {
                 {conversation.other_user_avatar ? (
                   <img
                     src={conversation.other_user_avatar}
-                    alt={conversation.other_user_name}
+                    alt={conversation.other_user_name || 'User'}
                     className="w-full h-full object-cover"
                   />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center bg-blue-100">
                     <span className="text-sm font-bold text-blue-600">
-                      {conversation.other_user_name.charAt(0)}
+                      {(conversation.other_user_name || 'U').charAt(0)}
                     </span>
                   </div>
                 )}
@@ -147,7 +147,7 @@ const MessagesPage: React.FC = () => {
                   <h3 className={`text-sm font-medium truncate ${
                     conversation.unread_count > 0 ? 'text-gray-900' : 'text-gray-700'
                   }`}>
-                    {conversation.other_user_name}
+                    {conversation.other_user_name || 'Unknown User'}
                   </h3>
                   <span className="text-xs text-gray-500 flex-shrink-0">
                     {formatLastMessageTime(conversation.last_message_at)}
@@ -201,19 +201,19 @@ const MessagesPage: React.FC = () => {
               {selectedConversation.other_user_avatar ? (
                 <img
                   src={selectedConversation.other_user_avatar}
-                  alt={selectedConversation.other_user_name}
+                  alt={selectedConversation.other_user_name || 'User'}
                   className="w-full h-full object-cover"
                 />
               ) : (
                 <div className="w-full h-full flex items-center justify-center bg-blue-100">
                   <span className="text-sm font-bold text-blue-600">
-                    {selectedConversation.other_user_name.charAt(0)}
+                    {(selectedConversation.other_user_name || 'U').charAt(0)}
                   </span>
                 </div>
               )}
             </div>
             <div>
-              <h3 className="font-medium text-gray-900">{selectedConversation.other_user_name}</h3>
+              <h3 className="font-medium text-gray-900">{selectedConversation.other_user_name || 'Unknown User'}</h3>
             </div>
           </div>
         </div>
