@@ -97,16 +97,16 @@ const NewProfilePage: React.FC<NewProfilePageProps> = ({
   const profileForModal = {
     id: profile.user_id,
     user_id: profile.user_id,
-    first_name: profile.first_name,
-    last_name: profile.last_name,
-    bio: profile.bio,
-    avatar_url: profile.avatar_url,
-    location: profile.location,
-    sports: profile.sports.map(sport => ({
-      sport: sport.sport_name,
-      level: sport.skill_level
+    first_name: profile.first_name || '',
+    last_name: profile.last_name || '',
+    bio: profile.bio || null,
+    avatar_url: profile.avatar_url || null,
+    location: profile.location || null,
+    sports: (profile.sports || []).map(sport => ({
+      sport: sport.sport_name || '',
+      level: sport.skill_level || 'Beginner'
     })),
-    updated_at: new Date().toISOString()
+    updated_at: profile.updated_at || new Date().toISOString()
   };
 
   return (
