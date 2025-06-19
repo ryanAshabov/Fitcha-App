@@ -179,7 +179,7 @@ const GlobalHeader: React.FC<GlobalHeaderProps> = ({ currentPage, onNavigate }) 
                     </button>
                     <button
                       onClick={() => {
-                        // TODO: Navigate to edit profile
+                        onNavigate('profile');
                         setShowProfileDropdown(false);
                       }}
                       className="flex items-center space-x-3 w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
@@ -189,7 +189,7 @@ const GlobalHeader: React.FC<GlobalHeaderProps> = ({ currentPage, onNavigate }) 
                     </button>
                     <button
                       onClick={() => {
-                        // TODO: Navigate to settings
+                        onNavigate('profile');
                         setShowProfileDropdown(false);
                       }}
                       className="flex items-center space-x-3 w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
