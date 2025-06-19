@@ -13,7 +13,8 @@ interface GlobalHeaderProps {
   onNavigate: (page: AppPage) => void;
 }
 
-// Skeleton component for loading state
+// Component to show a placeholder while data is loading
+// This improves user experience by preventing layout shifts
 const HeaderSkeleton: React.FC = () => {
   return (
     <header className="bg-white shadow-sm border-b fixed top-0 left-0 right-0 z-50">
@@ -30,13 +31,10 @@ const HeaderSkeleton: React.FC = () => {
           </div>
 
           {/* Right Section - Navigation & Profile */}
-          <div className="flex items-center space-x-1">
-            {/* Navigation skeleton */}
+          <div className="flex items-center space-x-2">
             {[...Array(5)].map((_, index) => (
-              <div key={index} className="w-16 h-12 bg-gray-200 rounded-lg animate-pulse"></div>
+              <div key={index} className="w-16 h-12 bg-gray-200 rounded-lg animate-pulse hidden sm:block"></div>
             ))}
-            
-            {/* Profile skeleton */}
             <div className="w-20 h-10 bg-gray-200 rounded-lg animate-pulse"></div>
           </div>
         </div>
@@ -50,20 +48,24 @@ const GlobalHeader: React.FC<GlobalHeaderProps> = ({ currentPage, onNavigate }) 
   const [searchQuery, setSearchQuery] = useState('');
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  // Get data from hooks with safe defaults
+  // --- DATA FETCHING & STATE MANAGEMENT ---
+  // We get data AND loading status from our custom hooks.
+  // We also provide a safe default value (like 0) to prevent errors.
   const { user, loading: userLoading } = useAuth();
   const { pendingCount = 0, loading: requestsLoading } = useGameRequests();
   const { unreadCount = 0, loading: notificationsLoading } = useNotifications();
   const { unreadCount: messageUnreadCount = 0, loading: messagesLoading } = useMessaging();
 
-  // Master loading state - wait for all critical data
+  // This is our master loading state. The header is "loading" if ANY of its data is still loading.
   const isLoading = userLoading || requestsLoading || notificationsLoading || messagesLoading;
-
-  // Safe user data extraction with optional chaining - always defined
-  const firstName = user?.user_metadata?.first_name || user?.email?.split('@')[0] || 'User';
+  
+  // --- SAFE DATA ACCESS ---
+  // Safely access user data with fallbacks to prevent "cannot read property of null" errors.
+  const firstName = user?.user_metadata?.first_name || 'User';
   const lastName = user?.user_metadata?.last_name || '';
   const userEmail = user?.email || '';
 
+  // --- EVENT HANDLERS & EFFECTS ---
   // Close dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -71,120 +73,98 @@ const GlobalHeader: React.FC<GlobalHeaderProps> = ({ currentPage, onNavigate }) 
         setShowProfileDropdown(false);
       }
     };
-
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
   const handleSignOut = async () => {
     await authService.signOut();
+    setShowProfileDropdown(false);
   };
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
-    // TODO: Implement global search functionality
     console.log('Search for:', searchQuery);
   };
+  
+  const handleDropdownNavigate = (page: AppPage) => {
+    onNavigate(page);
+    setShowProfileDropdown(false);
+  };
 
-  // Show skeleton while loading
+  // --- DEFENSIVE RENDERING ---
+  // This is the most important fix. We check the loading and user state BEFORE trying to render anything.
   if (isLoading) {
     return <HeaderSkeleton />;
   }
 
-  // If user is not authenticated after loading, show minimal header
+  // If loading is finished but there's no user, show a simple logged-out header.
   if (!user) {
     return (
       <header className="bg-white shadow-sm border-b fixed top-0 left-0 right-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
             <Logo size="small" variant="full" />
-            <div className="text-sm text-gray-600">Please sign in</div>
           </div>
         </div>
       </header>
     );
   }
 
+  // Navigation items array for clean mapping
   const navigationItems = [
-    {
-      key: 'home' as AppPage,
-      icon: Home,
-      label: 'Home',
-      active: currentPage === 'home'
-    },
-    {
-      key: 'find-players' as AppPage,
-      icon: Users,
-      label: 'Find Players',
-      active: currentPage === 'find-players'
-    },
-    {
-      key: 'book-court' as AppPage,
-      icon: Calendar,
-      label: 'Book a Court',
-      active: currentPage === 'book-court'
-    },
-    {
-      key: 'messages' as AppPage,
-      icon: MessageCircle,
-      label: 'Messages',
-      active: currentPage === 'messages',
-      badge: messageUnreadCount > 0 ? messageUnreadCount : undefined
-    },
-    {
-      key: 'requests' as AppPage,
-      icon: Inbox,
-      label: 'Requests',
-      active: currentPage === 'requests',
-      badge: pendingCount > 0 ? pendingCount : undefined
-    }
+    { key: 'home' as AppPage, icon: Home, label: 'Home' },
+    { key: 'find-players' as AppPage, icon: Users, label: 'Find Players' },
+    { key: 'book-court' as AppPage, icon: Calendar, label: 'Book a Court' },
+    { key: 'messages' as AppPage, icon: MessageCircle, label: 'Messages', badge: messageUnreadCount },
+    { key: 'requests' as AppPage, icon: Inbox, label: 'Requests', badge: pendingCount },
   ];
 
+  // --- MAIN RENDER ---
+  // If we reach this point, we know that isLoading is false and user exists. It is now safe to render.
   return (
     <header className="bg-white shadow-sm border-b fixed top-0 left-0 right-0 z-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
-          {/* Left Section - Logo */}
+          {/* Left Section */}
           <div className="flex items-center">
             <button onClick={() => onNavigate('home')} className="flex items-center">
               <Logo size="small" variant="full" />
             </button>
           </div>
 
-          {/* Center Section - Search Bar */}
+          {/* Center Section */}
           <div className="flex-1 max-w-lg mx-8">
             <form onSubmit={handleSearch} className="relative">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
-                <input
-                  type="text"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Search players and content..."
-                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-gray-50"
-                />
-              </div>
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search players and content..."
+                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-gray-50"
+              />
             </form>
           </div>
 
-          {/* Right Section - Navigation & Profile */}
+          {/* Right Section */}
           <div className="flex items-center space-x-1">
-            {/* Navigation Links */}
             {navigationItems.map((item) => {
               const IconComponent = item.icon;
+              const isActive = currentPage === item.key;
               return (
                 <button
                   key={item.key}
                   onClick={() => onNavigate(item.key)}
                   className={`relative flex flex-col items-center px-3 py-2 rounded-lg text-xs font-medium transition-colors ${
-                    item.active
+                    isActive
                       ? 'text-blue-600 bg-blue-50'
                       : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
                   }`}
                 >
                   <IconComponent size={20} />
                   <span className="mt-1 hidden sm:block">{item.label}</span>
-                  {item.badge && (
+                  {item.badge > 0 && (
                     <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center">
                       {item.badge > 9 ? '9+' : item.badge}
                     </span>
@@ -193,7 +173,6 @@ const GlobalHeader: React.FC<GlobalHeaderProps> = ({ currentPage, onNavigate }) 
               );
             })}
 
-            {/* Notifications */}
             <button className="relative p-2 text-gray-600 hover:text-gray-900 transition-colors">
               <Bell size={20} />
               {unreadCount > 0 && (
@@ -203,7 +182,6 @@ const GlobalHeader: React.FC<GlobalHeaderProps> = ({ currentPage, onNavigate }) 
               )}
             </button>
 
-            {/* Profile Dropdown */}
             <div className="relative" ref={dropdownRef}>
               <button
                 onClick={() => setShowProfileDropdown(!showProfileDropdown)}
@@ -217,52 +195,23 @@ const GlobalHeader: React.FC<GlobalHeaderProps> = ({ currentPage, onNavigate }) 
                 <span className="text-sm font-medium hidden md:block">Me</span>
               </button>
 
-              {/* Dropdown Menu */}
               {showProfileDropdown && (
                 <div className="absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-lg border border-gray-200">
                   <div className="p-4 border-b border-gray-200">
-                    <p className="font-medium text-gray-900">{firstName} {lastName}</p>
-                    <p className="text-sm text-gray-600">{userEmail}</p>
+                    <p className="font-medium text-gray-900 truncate">{firstName} {lastName}</p>
+                    <p className="text-sm text-gray-600 truncate">{userEmail}</p>
                   </div>
                   <div className="py-2">
-                    <button
-                      onClick={() => {
-                        onNavigate('profile');
-                        setShowProfileDropdown(false);
-                      }}
-                      className="flex items-center space-x-3 w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
-                    >
+                    <button onClick={() => handleDropdownNavigate('profile')} className="flex items-center space-x-3 w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
                       <User size={16} />
-                      <span>View My Profile</span>
+                      <span>View Profile</span>
                     </button>
-                    <button
-                      onClick={() => {
-                        onNavigate('profile');
-                        setShowProfileDropdown(false);
-                      }}
-                      className="flex items-center space-x-3 w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
-                    >
+                    <button onClick={() => handleDropdownNavigate('profile-edit')} className="flex items-center space-x-3 w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
                       <Edit size={16} />
                       <span>Edit Profile</span>
                     </button>
-                    <button
-                      onClick={() => {
-                        onNavigate('profile');
-                        setShowProfileDropdown(false);
-                      }}
-                      className="flex items-center space-x-3 w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
-                    >
-                      <Settings size={16} />
-                      <span>Account Settings</span>
-                    </button>
                     <hr className="my-2" />
-                    <button
-                      onClick={() => {
-                        handleSignOut();
-                        setShowProfileDropdown(false);
-                      }}
-                      className="flex items-center space-x-3 w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
-                    >
+                    <button onClick={handleSignOut} className="flex items-center space-x-3 w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
                       <LogOut size={16} />
                       <span>Sign Out</span>
                     </button>
