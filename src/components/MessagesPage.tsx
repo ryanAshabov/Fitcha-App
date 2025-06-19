@@ -10,11 +10,21 @@ const MessagesPage: React.FC = () => {
   const [newMessage, setNewMessage] = useState('');
   const [sendingMessage, setSendingMessage] = useState(false);
   const { conversations, loading: conversationsLoading, error: conversationsError } = useMessaging();
-  const { messages, loading: messagesLoading, sendMessage } = useConversation(selectedConversation?.conversation_id || null);
+  
+  // Conditionally call useConversation hook only when a conversation is selected
+  const conversationHookResult = useConversation(
+    selectedConversation?.conversation_id || null
+  );
+  
+  // Provide safe defaults when no conversation is selected
+  const messages = selectedConversation ? conversationHookResult.messages : [];
+  const messagesLoading = selectedConversation ? conversationHookResult.loading : false;
+  const sendMessage = selectedConversation ? conversationHookResult.sendMessage : async () => ({ success: false, error: 'No conversation selected' });
+  
   const { user } = useAuth();
 
   const handleSendMessage = async () => {
-    if (!newMessage.trim() || sendingMessage) return;
+    if (!newMessage.trim() || sendingMessage || !selectedConversation) return;
 
     setSendingMessage(true);
     const messageText = newMessage.trim();
