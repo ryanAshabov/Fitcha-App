@@ -13,17 +13,56 @@ interface GlobalHeaderProps {
   onNavigate: (page: AppPage) => void;
 }
 
+// Skeleton component for loading state
+const HeaderSkeleton: React.FC = () => {
+  return (
+    <header className="bg-white shadow-sm border-b fixed top-0 left-0 right-0 z-50">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="flex items-center justify-between h-16">
+          {/* Left Section - Logo */}
+          <div className="flex items-center">
+            <div className="w-24 h-8 bg-gray-200 rounded animate-pulse"></div>
+          </div>
+
+          {/* Center Section - Search Bar */}
+          <div className="flex-1 max-w-lg mx-8">
+            <div className="w-full h-10 bg-gray-200 rounded-lg animate-pulse"></div>
+          </div>
+
+          {/* Right Section - Navigation & Profile */}
+          <div className="flex items-center space-x-1">
+            {/* Navigation skeleton */}
+            {[...Array(5)].map((_, index) => (
+              <div key={index} className="w-16 h-12 bg-gray-200 rounded-lg animate-pulse"></div>
+            ))}
+            
+            {/* Profile skeleton */}
+            <div className="w-20 h-10 bg-gray-200 rounded-lg animate-pulse"></div>
+          </div>
+        </div>
+      </div>
+    </header>
+  );
+};
+
 const GlobalHeader: React.FC<GlobalHeaderProps> = ({ currentPage, onNavigate }) => {
   const [showProfileDropdown, setShowProfileDropdown] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const { user } = useAuth();
-  const { pendingCount } = useGameRequests();
-  const { unreadCount } = useNotifications();
-  const { unreadCount: messageUnreadCount } = useMessaging();
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  const firstName = user?.user_metadata?.first_name || 'User';
+  // Get data from hooks with safe defaults
+  const { user, loading: userLoading } = useAuth();
+  const { pendingCount = 0, loading: requestsLoading } = useGameRequests();
+  const { unreadCount = 0, loading: notificationsLoading } = useNotifications();
+  const { unreadCount: messageUnreadCount = 0, loading: messagesLoading } = useMessaging();
+
+  // Master loading state - wait for all critical data
+  const isLoading = userLoading || requestsLoading || notificationsLoading || messagesLoading;
+
+  // Safe user data extraction with fallbacks
+  const firstName = user?.user_metadata?.first_name || user?.email?.split('@')[0] || 'User';
   const lastName = user?.user_metadata?.last_name || '';
+  const userEmail = user?.email || '';
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -46,6 +85,25 @@ const GlobalHeader: React.FC<GlobalHeaderProps> = ({ currentPage, onNavigate }) 
     // TODO: Implement global search functionality
     console.log('Search for:', searchQuery);
   };
+
+  // Show skeleton while loading
+  if (isLoading) {
+    return <HeaderSkeleton />;
+  }
+
+  // If user is not authenticated after loading, show minimal header
+  if (!user) {
+    return (
+      <header className="bg-white shadow-sm border-b fixed top-0 left-0 right-0 z-50">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-between h-16">
+            <Logo size="small" variant="full" />
+            <div className="text-sm text-gray-600">Please sign in</div>
+          </div>
+        </div>
+      </header>
+    );
+  }
 
   const navigationItems = [
     {
@@ -164,7 +222,7 @@ const GlobalHeader: React.FC<GlobalHeaderProps> = ({ currentPage, onNavigate }) 
                 <div className="absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-lg border border-gray-200">
                   <div className="p-4 border-b border-gray-200">
                     <p className="font-medium text-gray-900">{firstName} {lastName}</p>
-                    <p className="text-sm text-gray-600">{user?.email || ''}</p>
+                    <p className="text-sm text-gray-600">{userEmail}</p>
                   </div>
                   <div className="py-2">
                     <button
