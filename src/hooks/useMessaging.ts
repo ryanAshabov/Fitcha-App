@@ -2,9 +2,11 @@ import { useState, useEffect, useRef } from 'react';
 import { Conversation, Message } from '../types/messaging';
 import { messagingService } from '../services/messagingService';
 import { useAuth } from './useAuth';
+import { supabase } from '../lib/supabase';
 
 export const useMessaging = () => {
   const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [unreadCount, setUnreadCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const { user } = useAuth();
@@ -13,11 +15,13 @@ export const useMessaging = () => {
   useEffect(() => {
     if (user && !fetchedRef.current) {
       fetchConversations();
+      fetchUnreadCount();
       setupRealtimeSubscription();
       fetchedRef.current = true;
     } else if (!user) {
       // Reset state when user logs out
       setConversations([]);
+      setUnreadCount(0);
       setLoading(false);
       setError(null);
       fetchedRef.current = false;
@@ -45,12 +49,29 @@ export const useMessaging = () => {
     }
   };
 
+  const fetchUnreadCount = async () => {
+    if (!user) return;
+
+    try {
+      const { data, error } = await supabase.rpc('get_unread_conversation_count');
+
+      if (error) {
+        throw error;
+      }
+
+      setUnreadCount(data || 0);
+    } catch (err: any) {
+      console.error('Error fetching unread count:', err);
+    }
+  };
+
   const setupRealtimeSubscription = () => {
     if (!user) return;
 
     const subscription = messagingService.subscribeToUserConversations(() => {
-      // Refresh conversations when new messages arrive
+      // Refresh conversations and unread count when new messages arrive
       fetchConversations();
+      fetchUnreadCount();
     });
 
     return () => {
@@ -68,18 +89,21 @@ export const useMessaging = () => {
       return { success: false, error: result.error.message };
     }
 
-    // Refresh conversations after sending message
+    // Refresh conversations and unread count after sending message
     await fetchConversations();
+    await fetchUnreadCount();
     return { success: true, data: result.data };
   };
 
   const refetch = () => {
     fetchedRef.current = false;
     fetchConversations();
+    fetchUnreadCount();
   };
 
   return {
     conversations,
+    unreadCount,
     loading,
     error,
     sendMessageToUser,

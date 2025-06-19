@@ -3,6 +3,7 @@ import { Search, Home, Users, Calendar, Inbox, Bell, MessageCircle, User, LogOut
 import { useAuth } from '../../hooks/useAuth';
 import { useGameRequests } from '../../hooks/useGameRequests';
 import { useNotifications } from '../../hooks/useNotifications';
+import { useMessaging } from '../../hooks/useMessaging';
 import { authService } from '../../services/authService';
 import { AppPage } from '../../App';
 import Logo from '../ui/Logo';
@@ -18,6 +19,7 @@ const GlobalHeader: React.FC<GlobalHeaderProps> = ({ currentPage, onNavigate }) 
   const { user } = useAuth();
   const { pendingCount } = useGameRequests();
   const { unreadCount } = useNotifications();
+  const { unreadCount: messageUnreadCount } = useMessaging();
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   const firstName = user?.user_metadata?.first_name || 'User';
@@ -68,7 +70,8 @@ const GlobalHeader: React.FC<GlobalHeaderProps> = ({ currentPage, onNavigate }) 
       key: 'messages' as AppPage,
       icon: MessageCircle,
       label: 'Messages',
-      active: currentPage === 'messages'
+      active: currentPage === 'messages',
+      badge: messageUnreadCount > 0 ? messageUnreadCount : undefined
     },
     {
       key: 'requests' as AppPage,
