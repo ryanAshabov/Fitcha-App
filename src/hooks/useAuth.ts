@@ -9,15 +9,15 @@ export const useAuth = () => {
   const initializedRef = useRef(false);
 
   useEffect(() => {
-    // Prevent re-initialization on window focus
-    if (initializedRef.current) return;
-    
-    // Check if supabase client is available
+    // Early return if supabase client is not available
     if (!supabase) {
       console.error('Supabase client is not initialized');
       setLoading(false);
       return;
     }
+
+    // Prevent re-initialization on window focus
+    if (initializedRef.current) return;
 
     // Get initial session with error handling
     supabase.auth.getSession()
@@ -57,6 +57,15 @@ export const useAuth = () => {
       setLoading(false);
     }
   }, []); // Empty dependency array to run only once
+
+  // Early return with safe defaults if supabase is not available
+  if (!supabase) {
+    return {
+      user: null,
+      session: null,
+      loading: false,
+    };
+  }
 
   return {
     user,
