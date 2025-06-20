@@ -15,23 +15,14 @@ export type AuthPage = 'login' | 'signup';
 export type AppPage = 'home' | 'profile' | 'find-players' | 'requests' | 'book-court' | 'court-details' | 'messages';
 
 function App() {
+  // --- 1. استدعاء كل الـ Hooks في البداية ---
   const [currentPage, setCurrentPage] = useState<AuthPage>('login');
   const [appPage, setAppPage] = useState<AppPage>('home');
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   const [selectedCourtId, setSelectedCourtId] = useState<string | null>(null);
   const { user, loading } = useAuth();
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading...</p>
-        </div>
-      </div>
-    );
-  }
-
+  // --- 2. تعريف كل الدوال المساعدة ---
   const handleViewProfile = (userId: string) => {
     setSelectedUserId(userId);
     setAppPage('profile');
@@ -56,10 +47,23 @@ function App() {
     console.log('Booking successful!');
   };
 
-  // If user is authenticated, show app pages with global navigation
+  // --- 3. الآن نقرر ماذا سنعرض بناءً على الشروط ---
+
+  // الحالة الأولى: التطبيق قيد التحميل
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // الحالة الثانية: المستخدم مسجل دخوله
   if (user) {
     const renderPageContent = () => {
-      // Handle court details page
       if (appPage === 'court-details' && selectedCourtId) {
         return (
           <CourtDetailsPage
@@ -69,45 +73,22 @@ function App() {
           />
         );
       }
-
       switch (appPage) {
         case 'messages':
           return <MessagesPage />;
         case 'book-court':
-          return (
-            <CourtSearchPage 
-              onNavigate={handleNavigate}
-              onViewCourt={handleViewCourt}
-            />
-          );
+          return <CourtSearchPage onNavigate={handleNavigate} onViewCourt={handleViewCourt} />;
         case 'requests':
           return <RequestsPage onNavigate={handleNavigate} />;
         case 'find-players':
-          return (
-            <FindPlayerPage 
-              onNavigate={handleNavigate}
-              onViewProfile={handleViewProfile}
-            />
-          );
+          return <FindPlayerPage onNavigate={handleNavigate} onViewProfile={handleViewProfile} />;
         case 'profile':
-          return (
-            <ProfileContainer 
-              onNavigate={handleNavigate}
-              viewingUserId={selectedUserId}
-            />
-          );
+          return <ProfileContainer onNavigate={handleNavigate} viewingUserId={selectedUserId} />;
         case 'home':
         default:
-          return (
-            <SocialFeedPage
-              onNavigate={handleNavigate}
-              onViewProfile={handleViewProfile}
-              onViewCourt={handleViewCourt}
-            />
-          );
+          return <SocialFeedPage onNavigate={handleNavigate} onViewProfile={handleViewProfile} onViewCourt={handleViewCourt} />;
       }
     };
-
     return (
       <MainLayout currentPage={appPage} onNavigate={handleNavigate}>
         {renderPageContent()}
@@ -115,7 +96,7 @@ function App() {
     );
   }
 
-  // If user is not authenticated, show auth pages
+  // الحالة الثالثة والأخيرة: المستخدم ليس مسجلاً دخوله
   return (
     <div className="min-h-screen bg-gray-50">
       {currentPage === 'login' ? (
