@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from './useAuth';
 
@@ -26,64 +26,103 @@ export const useNotifications = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const { user } = useAuth();
-  const fetchedRef = useRef(false);
 
   useEffect(() => {
-    if (user && !fetchedRef.current) {
-      fetchNotifications();
-      fetchUnreadCount();
-      fetchedRef.current = true;
-    } else if (!user) {
-      // Reset state when user logs out
-      setNotifications([]);
-      setUnreadCount(0);
-      setLoading(false);
-      setError(null);
-      fetchedRef.current = false;
-    }
-  }, [user?.id]);
-
-  const fetchNotifications = async () => {
-    if (!user) return;
-
-    try {
-      const { data, error: notificationsError } = await supabase
-        .from('notifications')
-        .select(`
-          *,
-          actor_profile:profiles!fk_notification_actor(first_name, last_name, avatar_url)
-        `)
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false })
-        .limit(20);
-
-      if (notificationsError) {
-        throw notificationsError;
+    const setupNotifications = async () => {
+      // Early return if no user
+      if (!user) {
+        setNotifications([]);
+        setUnreadCount(0);
+        setLoading(false);
+        setError(null);
+        return;
       }
 
-      setNotifications(data || []);
-    } catch (err: any) {
-      setError(err.message);
-    }
-  };
+      try {
+        // 1. Fetch initial notifications data first
+        const { data: notificationsData, error: notificationsError } = await supabase
+          .from('notifications')
+          .select(`
+            *,
+            actor_profile:profiles!fk_notification_actor(first_name, last_name, avatar_url)
+          `)
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: false })
+          .limit(20);
 
-  const fetchUnreadCount = async () => {
-    if (!user) return;
+        if (notificationsError) {
+          throw notificationsError;
+        }
 
-    try {
-      const { data, error: countError } = await supabase.rpc('get_unread_notifications_count');
+        // 2. Fetch unread count
+        const { data: unreadData, error: countError } = await supabase.rpc('get_unread_notifications_count');
 
-      if (countError) {
-        throw countError;
+        if (countError) {
+          throw countError;
+        }
+
+        // 3. Set initial state with fetched data
+        setNotifications(notificationsData || []);
+        setUnreadCount(unreadData || 0);
+        setError(null);
+
+      } catch (err: any) {
+        // Handle errors by setting error state and safe defaults
+        setError(err.message);
+        setNotifications([]);
+        setUnreadCount(0);
+      } finally {
+        // 4. Always set loading to false after initial fetch attempt
+        setLoading(false);
       }
 
-      setUnreadCount(data || 0);
-    } catch (err: any) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
+      // 5. Set up real-time subscription after initial state is established
+      const subscription = supabase
+        .channel('user_notifications')
+        .on(
+          'postgres_changes',
+          {
+            event: 'INSERT',
+            schema: 'public',
+            table: 'notifications',
+            filter: `user_id=eq.${user.id}`
+          },
+          async () => {
+            // When new notification arrives, refresh the data
+            try {
+              const { data: newNotificationsData } = await supabase
+                .from('notifications')
+                .select(`
+                  *,
+                  actor_profile:profiles!fk_notification_actor(first_name, last_name, avatar_url)
+                `)
+                .eq('user_id', user.id)
+                .order('created_at', { ascending: false })
+                .limit(20);
+
+              const { data: newUnreadData } = await supabase.rpc('get_unread_notifications_count');
+
+              if (newNotificationsData) {
+                setNotifications(newNotificationsData);
+              }
+              if (newUnreadData !== null) {
+                setUnreadCount(newUnreadData);
+              }
+            } catch (err) {
+              console.error('Error refreshing notifications:', err);
+            }
+          }
+        )
+        .subscribe();
+
+      // 6. Return cleanup function
+      return () => {
+        subscription.unsubscribe();
+      };
+    };
+
+    setupNotifications();
+  }, [user?.id]); // Only re-run when user ID changes
 
   const markAsRead = async (notificationIds?: string[]) => {
     if (!user) return;
@@ -97,7 +136,7 @@ export const useNotifications = () => {
         throw error;
       }
 
-      // Update local state
+      // Update local state optimistically
       if (notificationIds) {
         setNotifications(prev => 
           prev.map(notification => 
@@ -120,9 +159,9 @@ export const useNotifications = () => {
   };
 
   const refetch = () => {
-    fetchedRef.current = false;
-    fetchNotifications();
-    fetchUnreadCount();
+    setLoading(true);
+    // Trigger re-fetch by updating a dependency
+    window.location.reload();
   };
 
   return {

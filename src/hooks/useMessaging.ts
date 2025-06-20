@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { Conversation, Message } from '../types/messaging';
 import { messagingService } from '../services/messagingService';
 import { useAuth } from './useAuth';
@@ -10,74 +10,85 @@ export const useMessaging = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const { user } = useAuth();
-  const fetchedRef = useRef(false);
 
   useEffect(() => {
-    if (user && !fetchedRef.current) {
-      fetchConversations();
-      fetchUnreadCount();
-      setupRealtimeSubscription();
-      fetchedRef.current = true;
-    } else if (!user) {
-      // Reset state when user logs out
-      setConversations([]);
-      setUnreadCount(0);
-      setLoading(false);
-      setError(null);
-      fetchedRef.current = false;
-    }
-  }, [user?.id]);
-
-  const fetchConversations = async () => {
-    if (!user) return;
-
-    setLoading(true);
-    setError(null);
-
-    try {
-      const result = await messagingService.getUserConversations();
-
-      if (result.error) {
-        throw new Error(result.error.message);
+    const setupMessaging = async () => {
+      // Early return if no user
+      if (!user) {
+        setConversations([]);
+        setUnreadCount(0);
+        setLoading(false);
+        setError(null);
+        return;
       }
 
-      setConversations(result.data || []);
-    } catch (err: any) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
+      try {
+        // 1. Fetch initial conversations data first
+        const conversationsResult = await messagingService.getUserConversations();
+        
+        if (conversationsResult.error) {
+          throw new Error(conversationsResult.error.message);
+        }
 
-  const fetchUnreadCount = async () => {
-    if (!user) return;
+        // 2. Fetch unread count
+        const { data: unreadData, error: unreadError } = await supabase.rpc('get_unread_conversation_count');
+        
+        if (unreadError) {
+          throw unreadError;
+        }
 
-    try {
-      const { data, error } = await supabase.rpc('get_unread_conversation_count');
+        // 3. Set initial state with fetched data
+        setConversations(conversationsResult.data || []);
+        setUnreadCount(unreadData || 0);
+        setError(null);
 
-      if (error) {
-        throw error;
+      } catch (err: any) {
+        // Handle errors by setting error state and safe defaults
+        setError(err.message);
+        setConversations([]);
+        setUnreadCount(0);
+      } finally {
+        // 4. Always set loading to false after initial fetch attempt
+        setLoading(false);
       }
 
-      setUnreadCount(data || 0);
-    } catch (err: any) {
-      console.error('Error fetching unread count:', err);
-    }
-  };
+      // 5. Set up real-time subscription after initial state is established
+      const subscription = supabase
+        .channel('user_conversations')
+        .on(
+          'postgres_changes',
+          {
+            event: 'INSERT',
+            schema: 'public',
+            table: 'messages'
+          },
+          async () => {
+            // When new message arrives, refresh conversations and unread count
+            try {
+              const newConversationsResult = await messagingService.getUserConversations();
+              const { data: newUnreadData } = await supabase.rpc('get_unread_conversation_count');
+              
+              if (!newConversationsResult.error && newConversationsResult.data) {
+                setConversations(newConversationsResult.data);
+              }
+              if (newUnreadData !== null) {
+                setUnreadCount(newUnreadData);
+              }
+            } catch (err) {
+              console.error('Error refreshing conversations:', err);
+            }
+          }
+        )
+        .subscribe();
 
-  const setupRealtimeSubscription = () => {
-    if (!user) return;
-
-    const subscription = messagingService.subscribeToUserConversations(() => {
-      // Refresh conversations and unread count when new messages arrive
-      fetchConversations();
-      fetchUnreadCount();
-    });
-
-    return () => {
-      subscription.unsubscribe();
+      // 6. Return cleanup function
+      return () => {
+        subscription.unsubscribe();
+      };
     };
-  };
+
+    setupMessaging();
+  }, [user?.id]); // Only re-run when user ID changes
 
   const sendMessageToUser = async (recipientId: string, content: string) => {
     const result = await messagingService.sendMessageToUser({
@@ -90,15 +101,28 @@ export const useMessaging = () => {
     }
 
     // Refresh conversations and unread count after sending message
-    await fetchConversations();
-    await fetchUnreadCount();
+    try {
+      const conversationsResult = await messagingService.getUserConversations();
+      const { data: unreadData } = await supabase.rpc('get_unread_conversation_count');
+      
+      if (!conversationsResult.error && conversationsResult.data) {
+        setConversations(conversationsResult.data);
+      }
+      if (unreadData !== null) {
+        setUnreadCount(unreadData);
+      }
+    } catch (err) {
+      // Silently handle refresh errors - the message was still sent
+      console.error('Failed to refresh conversations after sending message:', err);
+    }
+
     return { success: true, data: result.data };
   };
 
   const refetch = () => {
-    fetchedRef.current = false;
-    fetchConversations();
-    fetchUnreadCount();
+    setLoading(true);
+    // Trigger re-fetch by updating a dependency
+    window.location.reload();
   };
 
   return {
@@ -118,61 +142,89 @@ export const useConversation = (conversationId: string | null) => {
   const { user } = useAuth();
 
   useEffect(() => {
-    if (conversationId && user) {
-      fetchMessages();
-      setupRealtimeSubscription();
-    } else {
-      setMessages([]);
-      setError(null);
-    }
-  }, [conversationId, user?.id]);
-
-  const fetchMessages = async () => {
-    if (!conversationId) return;
-
-    setLoading(true);
-    setError(null);
-
-    try {
-      const result = await messagingService.getConversationMessages(conversationId);
-
-      if (result.error) {
-        throw new Error(result.error.message);
+    const setupConversation = async () => {
+      // Early return if no conversation ID or user
+      if (!conversationId || !user) {
+        setMessages([]);
+        setError(null);
+        setLoading(false);
+        return;
       }
 
-      setMessages(result.data || []);
-      
-      // Mark messages as read
-      await messagingService.markMessagesAsRead(conversationId);
-    } catch (err: any) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
+      setLoading(true);
 
-  const setupRealtimeSubscription = () => {
-    if (!conversationId) return;
+      try {
+        // 1. Fetch initial messages first
+        const result = await messagingService.getConversationMessages(conversationId);
 
-    const subscription = messagingService.subscribeToConversationMessages(
-      conversationId,
-      (newMessage) => {
-        // Only add message if it's not from the current user (to avoid duplicates from optimistic updates)
-        if (newMessage.sender_id !== user?.id) {
-          setMessages(prev => [...prev, newMessage]);
+        if (result.error) {
+          throw new Error(result.error.message);
         }
+
+        // 2. Set initial state with fetched data
+        setMessages(result.data || []);
+        setError(null);
         
-        // Mark as read if it's not from current user
-        if (newMessage.sender_id !== user?.id) {
-          messagingService.markMessagesAsRead(conversationId);
-        }
-      }
-    );
+        // 3. Mark messages as read
+        await messagingService.markMessagesAsRead(conversationId);
 
-    return () => {
-      subscription.unsubscribe();
+      } catch (err: any) {
+        // Handle errors by setting error state and safe defaults
+        setError(err.message);
+        setMessages([]);
+      } finally {
+        // 4. Always set loading to false after initial fetch attempt
+        setLoading(false);
+      }
+
+      // 5. Set up real-time subscription after initial state is established
+      const subscription = supabase
+        .channel(`conversation_messages_${conversationId}`)
+        .on(
+          'postgres_changes',
+          {
+            event: 'INSERT',
+            schema: 'public',
+            table: 'messages',
+            filter: `conversation_id=eq.${conversationId}`
+          },
+          async (payload) => {
+            // When new message arrives, fetch complete message data
+            try {
+              const { data } = await supabase.rpc('get_conversation_messages', {
+                p_conversation_id: conversationId
+              });
+              
+              if (data && data.length > 0) {
+                // Find the new message (it should be the last one)
+                const newMessage = data.find((msg: Message) => msg.message_id === payload.new.id);
+                if (newMessage) {
+                  // Only add message if it's not from the current user (to avoid duplicates from optimistic updates)
+                  if (newMessage.sender_id !== user?.id) {
+                    setMessages(prev => [...prev, newMessage]);
+                  }
+                  
+                  // Mark as read if it's not from current user
+                  if (newMessage.sender_id !== user?.id) {
+                    messagingService.markMessagesAsRead(conversationId);
+                  }
+                }
+              }
+            } catch (err) {
+              console.error('Error handling new message:', err);
+            }
+          }
+        )
+        .subscribe();
+
+      // 6. Return cleanup function
+      return () => {
+        subscription.unsubscribe();
+      };
     };
-  };
+
+    setupConversation();
+  }, [conversationId, user?.id]); // Re-run when conversation ID or user ID changes
 
   const sendMessage = async (content: string) => {
     if (!conversationId || !content.trim()) return { success: false, error: 'Invalid message' };
@@ -217,6 +269,9 @@ export const useConversation = (conversationId: string | null) => {
     loading,
     error,
     sendMessage,
-    refetch: fetchMessages
+    refetch: () => {
+      setLoading(true);
+      window.location.reload();
+    }
   };
 };
