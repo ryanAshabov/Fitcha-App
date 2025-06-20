@@ -6,7 +6,6 @@ import { useNotifications } from '../../hooks/useNotifications';
 import { useMessaging } from '../../hooks/useMessaging';
 import { authService } from '../../services/authService';
 import { AppPage } from '../../App';
-// لاحظ أننا لم نعد نستخدم مكون الشعار مؤقتاً، لكن سنترك الـ import
 import Logo from '../ui/Logo';
 
 interface GlobalHeaderProps {
@@ -83,15 +82,13 @@ const GlobalHeader: React.FC<GlobalHeaderProps> = ({ currentPage, onNavigate }) 
     return <HeaderSkeleton />;
   }
 
-  // --- التعديل الأول هنا ---
   // If loading is finished but there's no user, show a simple logged-out header.
   if (!user) {
     return (
       <header className="bg-white shadow-sm border-b fixed top-0 left-0 right-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
-            {/* <Logo size="small" variant="full" /> */} {/* تم تعطيل الشعار مؤقتاً */}
-            <div className="font-bold text-xl">FITCHA</div> {/* نص بديل للاختبار */}
+            <Logo size="small" variant="full" />
           </div>
         </div>
       </header>
@@ -110,11 +107,9 @@ const GlobalHeader: React.FC<GlobalHeaderProps> = ({ currentPage, onNavigate }) 
     <header className="bg-white shadow-sm border-b fixed top-0 left-0 right-0 z-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
-          {/* --- التعديل الثاني هنا --- */}
           <div className="flex items-center">
             <button onClick={() => onNavigate('home')} className="flex items-center">
-              {/* <Logo size="small" variant="full" /> */} {/* تم تعطيل الشعار مؤقتاً */}
-              <div className="font-bold text-xl">FITCHA</div> {/* نص بديل للاختبار */}
+              <Logo size="small" variant="full" />
             </button>
           </div>
 
