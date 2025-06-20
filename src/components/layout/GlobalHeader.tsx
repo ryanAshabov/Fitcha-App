@@ -60,9 +60,10 @@ const GlobalHeader: React.FC<GlobalHeaderProps> = ({ currentPage, onNavigate }) 
   const isLoading = userLoading || requestsLoading || notificationsLoading || messagesLoading;
   
   // --- SAFE DATA ACCESS ---
-  // Safely access user data with fallbacks to prevent "cannot read property of null" errors.
-  const firstName = user?.user_metadata?.first_name || 'User';
-  const lastName = user?.user_metadata?.last_name || '';
+  // Safely access user metadata with proper type checking to prevent runtime errors
+  const safeUserMetadata = user?.user_metadata && typeof user.user_metadata === 'object' ? user.user_metadata : {};
+  const firstName = safeUserMetadata.first_name || 'User';
+  const lastName = safeUserMetadata.last_name || '';
   const userEmail = user?.email || '';
 
   // --- EVENT HANDLERS & EFFECTS ---
