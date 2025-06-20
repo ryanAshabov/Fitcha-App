@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
 
@@ -6,70 +6,49 @@ export const useAuth = () => {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
-  const initializedRef = useRef(false);
 
   useEffect(() => {
-    // Early return if supabase client is not available
-    if (!supabase) {
-      console.error('Supabase client is not initialized');
-      setLoading(false);
-      return;
-    }
+    // دالة لترتيب العمليات بشكل صحيح باستخدام async/await
+    const setupAuth = async () => {
+      try {
+        // 1. احصل على الجلسة الحالية أولاً وانتظر النتيجة
+        const { data: { session: initialSession }, error: sessionError } = await supabase.auth.getSession();
 
-    // Prevent re-initialization on window focus
-    if (initializedRef.current) return;
+        if (sessionError) {
+          console.error('Error getting initial session:', sessionError);
+          // حتى لو حدث خطأ، يجب أن نكمل إعداد المستمع
+        }
+        
+        // 2. قم بتعيين الحالة الأولية بناءً على الجلسة التي حصلت عليها
+        setSession(initialSession);
+        setUser(initialSession?.user ?? null);
 
-    // Get initial session with error handling
-    supabase.auth.getSession()
-      .then(({ data: { session } }) => {
-        setSession(session);
-        setUser(session?.user ?? null);
-        setLoading(false);
-        initializedRef.current = true;
-      })
-      .catch((error) => {
-        console.error('Error getting session:', error);
+      } catch (error) {
+        console.error("An unexpected error occurred during session retrieval:", error);
         setSession(null);
         setUser(null);
+      } finally {
+        // 3. الآن وبعد أن استقرت الحالة الأولية، قم بإنهاء التحميل
         setLoading(false);
-        initializedRef.current = true;
+      }
+
+      // 4. الآن قم بإعداد المستمع للتغييرات المستقبلية (تسجيل الدخول/الخروج)
+      const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, newSession) => {
+        setSession(newSession);
+        setUser(newSession?.user ?? null);
+        // لا نحتاج لتغيير حالة التحميل هنا لأنها للتغييرات فقط
       });
 
-    // Listen for auth changes with error handling
-    try {
-      const {
-        data: { subscription },
-      } = supabase.auth.onAuthStateChange((_event, session) => {
-        setSession(session);
-        setUser(session?.user ?? null);
-        setLoading(false);
-      });
-
+      // 5. عند إزالة المكون، قم بإلغاء الاشتراك
       return () => {
-        try {
-          subscription.unsubscribe();
-        } catch (error) {
-          console.error('Error unsubscribing from auth changes:', error);
-        }
+        subscription?.unsubscribe();
       };
-    } catch (error) {
-      console.error('Error setting up auth state change listener:', error);
-      setLoading(false);
-    }
-  }, []); // Empty dependency array to run only once
-
-  // Early return with safe defaults if supabase is not available
-  if (!supabase) {
-    return {
-      user: null,
-      session: null,
-      loading: false,
     };
-  }
 
-  return {
-    user,
-    session,
-    loading,
-  };
+    // قم بتشغيل الدالة
+    setupAuth();
+
+  }, []); // يعمل هذا التأثير مرة واحدة فقط عند تحميل المكون
+
+  return { user, session, loading };
 };
